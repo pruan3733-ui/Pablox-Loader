@@ -109,16 +109,20 @@ local function CheckControl()
     return HttpJson(CONTROL_URL .. "/api/public/status", "GET")
 end
 
+local ActiveKey = nil
 local function SendHeartbeat()
     return HttpJson(CONTROL_URL .. "/api/public/heartbeat", "POST", {
         userId = tostring(Player.UserId),
         username = Player.Name,
-        displayName = Player.DisplayName
+        displayName = Player.DisplayName,
+        key = ActiveKey
     })
 end
 
 local function ControlMessage(data)
     if data.banned then return "ACESSO BLOQUEADO" end
+    if data.disabled then return "HUB DESATIVADA PELO ADMINISTRADOR" end
+    if data.invalidKey then return "KEY CANCELADA OU EXPIRADA" end
     if data.maintenance then
         return tostring(data.message or "O Hub está atualizando")
     end
@@ -483,6 +487,7 @@ local function Login(key, automatic)
     local valid, message, resultType = ValidateKey(key)
 
     if valid then
+        ActiveKey = key
         local control, controlError = CheckControl()
         if not control then
             Main.Visible = true
@@ -541,3 +546,4 @@ task.spawn(function()
 end)
 
 print("[PABLOX KEY SYSTEM V9 + CONTROL V5] Carregado.")
+a
