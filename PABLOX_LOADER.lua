@@ -252,31 +252,16 @@ end
 
 local function StopHub(reason)
     Monitor.running = false
-    Notify("PABLOX HUB", reason, 8)
-    local noticeGui = Instance.new("ScreenGui")
-    noticeGui.Name = "PABLOX_MAINTENANCE_NOTICE"
-    noticeGui.ResetOnSpawn = false
-    noticeGui.DisplayOrder = 99999
-    noticeGui.Parent = PlayerGui
-    local label = Instance.new("TextLabel")
-    label.AnchorPoint = Vector2.new(0.5, 0.5)
-    label.Position = UDim2.fromScale(0.5, 0.5)
-    label.Size = UDim2.new(0.85, 0, 0, 100)
-    label.BackgroundColor3 = Color3.fromRGB(15, 17, 24)
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Font = Enum.Font.GothamBold
-    label.TextScaled = true
-    label.TextWrapped = true
-    label.Text = reason
-    label.Parent = noticeGui
-    local radius = Instance.new("UICorner")
-    radius.CornerRadius = UDim.new(0, 12)
-    radius.Parent = label
-    warn("[PABLOX HUB CONTROL]", reason)
-    -- Para encerrar realmente a Hub V16, a própria Hub deve expor Cleanup:
-    -- _G.PABLOX_HUB_CLEANUP = Cleanup
-    if type(_G.PABLOX_HUB_CLEANUP) == "function" then
+    local message = tostring(reason or "O Hub está atualizando")
+    warn("[PABLOX HUB CONTROL]", message)
+    -- Exibe somente a notificação interna da Hub e encerra suas funções.
+    if type(_G.PABLOX_HUB_MAINTENANCE) == "function" then
+        pcall(_G.PABLOX_HUB_MAINTENANCE, message)
+    elseif type(_G.PABLOX_HUB_CLEANUP) == "function" then
         pcall(_G.PABLOX_HUB_CLEANUP)
+    else
+        -- Versão antiga da Hub: não cria overlay gigante no celular.
+        Notify("PABLOX HUB", message, 5)
     end
 end
 
