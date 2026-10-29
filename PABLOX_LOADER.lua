@@ -110,12 +110,14 @@ local function CheckControl()
 end
 
 local ActiveKey = nil
+local LoadedVersion = nil
 local function SendHeartbeat()
     return HttpJson(CONTROL_URL .. "/api/public/heartbeat", "POST", {
         userId = tostring(Player.UserId),
         username = Player.Name,
         displayName = Player.DisplayName,
-        key = ActiveKey
+        key = ActiveKey,
+        version = LoadedVersion
     })
 end
 
@@ -148,6 +150,8 @@ local function LoadHub(key)
     end
     local statusCode = tonumber(response.StatusCode or response.Status) or 0
     local source = response.Body
+    local headers = response.Headers or {}
+    LoadedVersion = headers["x-pablox-version"] or headers["X-Pablox-Version"] or LoadedVersion
     if statusCode ~= 200 then
         local parsed, info = pcall(function() return HttpService:JSONDecode(source or "") end)
         local reason = parsed and type(info) == "table" and (info.message or info.error)
@@ -546,4 +550,3 @@ task.spawn(function()
 end)
 
 print("[PABLOX KEY SYSTEM V9 + CONTROL V5] Carregado.")
-a
