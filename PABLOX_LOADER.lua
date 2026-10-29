@@ -122,6 +122,7 @@ local function SendHeartbeat()
 end
 
 local function ControlMessage(data)
+    if data.kicked then return "PABLOX HUB | Você foi expulso pelo criador do Hub." end
     if data.banned then return "ACESSO BLOQUEADO" end
     if data.disabled then return "HUB DESATIVADA PELO ADMINISTRADOR" end
     if data.invalidKey then return "KEY CANCELADA OU EXPIRADA" end
@@ -260,6 +261,10 @@ end
 
 local function StopHub(reason)
     Monitor.running = false
+    if tostring(reason or ""):find("expulso pelo criador do Hub", 1, true) then
+        pcall(function() Player:Kick("PABLOX HUB | Você foi expulso pelo criador do Hub.") end)
+        return
+    end
     local message = tostring(reason or "O Hub está atualizando")
     warn("[PABLOX HUB CONTROL]", message)
     -- Exibe somente a notificação interna da Hub e encerra suas funções.
@@ -280,7 +285,7 @@ local function StartControl()
         while Monitor.running do
             local data = SendHeartbeat()
             if data then
-                if data.maintenance or data.banned or data.ok == false then
+                if data.kicked or data.maintenance or data.banned or data.ok == false then
                     StopHub(ControlMessage(data))
                     break
                 end
