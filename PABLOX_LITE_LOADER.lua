@@ -78,16 +78,18 @@ local function HttpJson(url, method, body)
         return nil, "ERRO DE CONEXÃO"
     end
     local statusCode = tonumber(response.StatusCode or response.Status)
-    if not statusCode or statusCode >= 500 then
-        return nil, "SERVIDOR INDISPONÍVEL"
-    end
     local decoded, data = pcall(function()
         return HttpService:JSONDecode(response.Body or "")
     end)
-    if not decoded or type(data) ~= "table" then
-        return nil, "RESPOSTA INVÁLIDA"
+    -- v2: se o servidor respondeu com um JSON, mostra o motivo REAL (manutenção, erro, key) em vez de
+    -- esconder tudo atrás de "SERVIDOR INDISPONÍVEL".
+    if decoded and type(data) == "table" then
+        return data, nil, statusCode
     end
-    return data, nil, statusCode
+    if not statusCode or statusCode >= 500 then
+        return nil, "SERVIDOR INDISPONÍVEL" .. (statusCode and (" (HTTP " .. statusCode .. ")") or ""), statusCode
+    end
+    return nil, "RESPOSTA INVÁLIDA (HTTP " .. tostring(statusCode) .. ")", statusCode
 end
 
 local function ValidateKey(key)
@@ -109,8 +111,9 @@ local function CheckControl()
     return HttpJson(CONTROL_URL .. "/api/public/status", "GET")
 end
 
-local function SendHeartbeat()
+local function SendHeartbeat(key)
     return HttpJson(CONTROL_URL .. "/api/public/heartbeat", "POST", {
+        key = key,
         userId = tostring(Player.UserId),
         username = Player.Name,
         displayName = Player.DisplayName
@@ -122,7 +125,7 @@ local function ControlMessage(data)
     if data.maintenance then
         return tostring(data.message or "O Hub está atualizando")
     end
-    return tostring(data.message or "SERVIDOR INDISPONÍVEL")
+    return tostring(data.message or data.error or "SERVIDOR INDISPONÍVEL")
 end
 
 local function LoadHub(key)
@@ -283,12 +286,13 @@ local function StopHub(reason)
     end
 end
 
-local function StartControl()
+local HubUrl = ""
+local function StartControl(key)
     if Monitor.running then return end
     Monitor.running = true
     task.spawn(function()
         while Monitor.running do
-            local data = SendHeartbeat()
+            local data = SendHeartbeat(key)
             if data then
                 if data.maintenance or data.banned or data.ok == false then
                     StopHub(ControlMessage(data))
@@ -384,8 +388,8 @@ Verify.Parent = Main
 Corner(Verify, 8)
 
 local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(1, -30, 0, 30)
-Status.Position = UDim2.fromOffset(15, 130)
+Status.Size = UDim2.new(1, -30, 0, 38)
+Status.Position = UDim2.fromOffset(15, 128)
 Status.BackgroundTransparency = 1
 Status.Text = "AGUARDANDO KEY"
 Status.TextColor3 = Color3.fromRGB(210, 210, 210)
@@ -502,16 +506,16 @@ local function Login(key, automatic)
 
     if valid then
         local control, controlError = CheckControl()
-        if not control then
+        if not control or control.error then
             Main.Visible = true
             Open.Visible = false
-            Status.Text = string.upper(controlError or "SERVIDOR INDISPONÍVEL")
+            Status.Text = string.upper(tostring(controlError or (control and control.error) or "SERVIDOR INDISPONÍVEL"))
         elseif control.maintenance then
             Main.Visible = true
             Open.Visible = false
             Status.Text = ControlMessage(control)
         else
-            local heartbeat, heartbeatError = SendHeartbeat()
+            local heartbeat, heartbeatError = SendHeartbeat(key)
             if not heartbeat or heartbeat.ok ~= true then
                 Main.Visible = true
                 Open.Visible = false
@@ -522,7 +526,7 @@ local function Login(key, automatic)
                 Notify("PABLOX LITE", "Key validada com sucesso!", 3)
                 local loaded, loadError = LoadHub(key)
                 if loaded then
-                    StartControl()
+                    StartControl(key)
                     Gui:Destroy()
                     Busy = false
                     return
